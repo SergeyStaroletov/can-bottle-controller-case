@@ -76,6 +76,7 @@ void receive_messages() {
       unsigned short canId = CAN.getCanId();
       if (canId == controller3 || canId == all) {
         if (buf[0] == startBottleFilling) {
+          Serial.println("[can] request to startBottleFilling");
           procActive[Proc::BottleFilling] = true;
         }
       }

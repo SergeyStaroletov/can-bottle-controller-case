@@ -76,6 +76,7 @@ void receive_messages() {
       unsigned short canId = CAN.getCanId();
       if (canId == controller4 || canId == all) {
         if (buf[0] == startNextBottle) {
+          Serial.println("[can] request to startNextBottle");
           procActive[Proc::NextBottle] = true;
         }
       }

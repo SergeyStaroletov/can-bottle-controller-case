@@ -80,7 +80,16 @@ void receive_messages() {
       unsigned short canId = CAN.getCanId();
       if (canId == controller2 || canId == all) {
         if (buf[0] == startForcedSterilization) {
+          Serial.println("[can] request to startForcedSterilization");          
           procActive[Proc::ForcedSterilization] = true;
+        }
+        if (buf[0] == startKeepSterilization) {
+          Serial.println("[can] request to startKeepSterilization");
+          procActive[Proc::KeepSterilization] = true;
+        }
+        if (buf[0] == stopKeepSterilization) {
+          Serial.println("[can] request to stopKeepSterilization");
+          procActive[Proc::KeepSterilization] = false;
         }
       }
     }
@@ -144,6 +153,7 @@ void loop() {
             Serial.println("restarting");
             currState[Proc::KeepSterilization] = KeepSterilizationWaitLowTemp; //restart
           }
+          contunue_loop();
         }
       }
     }
@@ -152,6 +162,10 @@ void loop() {
 
   SKIP:
   delay(1000);
+
+  //RR strategy
+  currProc = currProc + 1;
+  if (currProc > 1) currProc = 0;  
 }
 
 /*********************************************************************************************************
