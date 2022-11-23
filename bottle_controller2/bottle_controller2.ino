@@ -3,31 +3,33 @@
 
 #include <SPI.h>
 #include "mcp_can.h"
-
+ 
 
 //messages
-#define startForcedSterilization 1 
-#define startKeepSterilization 2
-#define stopKeepSterilization 3
-#define startBottleFilling 4
-#define startNextBottle 5
-#define activeForcedSterilization 6
-#define passiveForcedSterilization 7
-#define activeBottleFilling 8
-#define passiveBottleFilling 9
-#define activeNextBottle 10
-#define passiveNextBottle 11
-//processes
-#define contunue_loop() goto SKIP; 
+enum Msg {
+  startForcedSterilization,
+  startKeepSterilization,
+  stopKeepSterilization,
+  startBottleFilling,
+  startNextBottle,
+  activeForcedSterilization,
+  passiveForcedSterilization,
+  activeBottleFilling,
+  passiveBottleFilling,
+  activeNextBottle,
+  passiveNextBottle,
+  activeKeepSterilization,
+  passiveKeepSterilization
+};
 
-#define all 0
-#define controller1 1
-#define controller2 2
-#define controller3 3
-#define controller4 4
+//controllers
+enum Controller {all, controller1, controller2, controller3, controller4};
 
-enum  Proc {ForcedSterilization=0, KeepSterilization, /* foreign */ };
-enum  State {
+//processes needed for the current controller 
+enum Proc {ForcedSterilization=0, KeepSterilization, /* foreign */} ;
+
+//states
+enum State {
     ForcedSterilizationHeatUp=0, ForcedSterilizationSterilizationFor1min, 
     KeepSterilizationWaitLowTemp, KeepSterilizationWaitHighTemp
 };
@@ -70,35 +72,45 @@ void setup_CAN() {
   Serial.println("CAN ready!");
 }
 
-void receive_messages() {
-  byte buf[8];
-  byte len;
-
-  while (CAN_MSGAVAIL == CAN.checkReceive())  // check if data is coming
-    {
-      CAN.readMsgBuf(&len, buf);            
-      unsigned short canId = CAN.getCanId();
-      if (canId == controller2 || canId == all) {
-        if (buf[0] == startForcedSterilization) {
-          Serial.println("[can] request to startForcedSterilization");          
-          procActive[Proc::ForcedSterilization] = true;
-        }
-        if (buf[0] == startKeepSterilization) {
-          Serial.println("[can] request to startKeepSterilization");
-          procActive[Proc::KeepSterilization] = true;
-        }
-        if (buf[0] == stopKeepSterilization) {
-          Serial.println("[can] request to stopKeepSterilization");
-          procActive[Proc::KeepSterilization] = false;
-        }
-      }
-    }
-}
 
 void message(int to, int type) {
   byte buf[1];
   buf[0] = type;
-  CAN.sendMsgBuf(to, 0, buf, sizeof(buf), true);
+  CAN.sendMsgBuf((unsigned long)to, 0, sizeof(buf), buf, true);
+}
+
+
+
+void receive_messages() {
+  byte buf[8];
+  byte len;
+  while (CAN_MSGAVAIL == CAN.checkReceive())  // check if data is coming
+    {
+      CAN.readMsgBuf(&len, buf);            
+      unsigned short canId = CAN.getCanId();
+      Serial.print("CAN message, to id = ");
+      Serial.println(canId);      
+      if (canId == controller2 || canId == all) {
+        if (buf[0] == Msg::startForcedSterilization) {
+          Serial.println("[can] request to startForcedSterilization");          
+          procActive[Proc::ForcedSterilization] = true;
+          //notify all about it
+          message(Controller::all, Msg::activeForcedSterilization);
+        }
+        if (buf[0] == Msg::startKeepSterilization) {
+          Serial.println("[can] request to startKeepSterilization");
+          procActive[Proc::KeepSterilization] = true;
+          //notify all about it
+          message(Controller::all, Msg::activeKeepSterilization);          
+        }
+        if (buf[0] == Msg::stopKeepSterilization) {
+          Serial.println("[can] request to stopKeepSterilization");
+          procActive[Proc::KeepSterilization] = false;
+          //notify all about it
+          message(Controller::all, Msg::passiveKeepSterilization);           
+        }
+      }
+    }
 }
 
 
@@ -122,7 +134,7 @@ void loop() {
               currState[Proc::ForcedSterilization] = ForcedSterilizationSterilizationFor1min;              
               timeInState[State::ForcedSterilizationSterilizationFor1min] = 0;
           }
-          contunue_loop();
+          break;
         }
         case ForcedSterilizationSterilizationFor1min: {
           Serial.println("ForcedSterilization:SterilizationFor1min");
@@ -131,9 +143,11 @@ void loop() {
             Serial.println("timeour for ForcedSterilization:SterilizationFor1min");
             timeInState[State::ForcedSterilizationSterilizationFor1min] = 0;
             oSteam = OFF;
-            procActive[ForcedSterilization] = false;
+            procActive[Proc::ForcedSterilization] = false;
+            //notify
+            message(Controller::all, Msg::passiveForcedSterilization);
           }
-          contunue_loop();
+          break;
         }
       }
     case Proc::KeepSterilization: if (procActive[Proc::KeepSterilization]) {
@@ -144,16 +158,16 @@ void loop() {
             oSteam = ON;
             currState[Proc::KeepSterilization] = KeepSterilizationWaitHighTemp;
           }
-          contunue_loop();
+          break;
         }
         case KeepSterilizationWaitHighTemp: {
           Serial.println("KeepSterilization:WaitHighTemp");
           if (iHighTemp == ON) {
             oSteam = OFF;
             Serial.println("restarting");
-            currState[Proc::KeepSterilization] = KeepSterilizationWaitLowTemp; //restart
+            currState[Proc::KeepSterilization] = KeepSterilizationWaitLowTemp; //restart-go to the first state
           }
-          contunue_loop();
+          break;
         }
       }
     }

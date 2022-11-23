@@ -4,30 +4,28 @@
 #include <SPI.h>
 #include "mcp_can.h"
 
-
 //messages
-#define startForcedSterilization 1 
-#define startKeepSterilization 2
-#define stopKeepSterilization 3
-#define startBottleFilling 4
-#define startNextBottle 5
-#define activeForcedSterilization 6
-#define passiveForcedSterilization 7
-#define activeBottleFilling 8
-#define passiveBottleFilling 9
-#define activeNextBottle 10
-#define passiveNextBottle 11
-//processes
-#define contunue_loop() goto SKIP; 
+enum Msg {
+  startForcedSterilization,
+  startKeepSterilization,
+  stopKeepSterilization,
+  startBottleFilling,
+  startNextBottle,
+  activeForcedSterilization,
+  passiveForcedSterilization,
+  activeBottleFilling,
+  passiveBottleFilling,
+  activeNextBottle,
+  passiveNextBottle,
+  activeKeepSterilization,
+  passiveKeepSterilization
+};
 
-#define all 0
-#define controller1 1
-#define controller2 2
-#define controller3 3
-#define controller4 4
+//controllers
+enum Controller {all, controller1, controller2, controller3, controller4};
 
-enum  Proc {NextBottle=0, /* foreign */ };
-enum  State {
+enum Proc {NextBottle=0, /* foreign */ };
+enum State {
     NextBottleBegin=0, NextBottleWaitBottlePosition
 };
 
@@ -56,7 +54,7 @@ void setup_CAN() {
   START_INIT:
     if (CAN_OK == CAN.begin(CAN_500KBPS, MCP_8MHz))  // init can bus : baudrate = 500k
     {
-      Serial.println("CAN BUS Shield init ok!");
+      Serial.println("CAN BUS Shield init ok");
     } else {
       Serial.println("CAN BUS Shield init fail");
       Serial.println("Init CAN BUS Shield again");
@@ -66,28 +64,32 @@ void setup_CAN() {
   Serial.println("CAN ready!");
 }
 
+void message(int to, int type) {
+  byte buf[1];
+  buf[0] = type;
+  CAN.sendMsgBuf((unsigned long)to, 0, sizeof(buf), buf, true);
+}
+
+
+
 void receive_messages() {
   byte buf[8];
   byte len;
-
   while (CAN_MSGAVAIL == CAN.checkReceive())  // check if data is coming
     {
       CAN.readMsgBuf(&len, buf);            
       unsigned short canId = CAN.getCanId();
-      if (canId == controller4 || canId == all) {
-        if (buf[0] == startNextBottle) {
+      if (canId == Controller::controller4 || canId == Controller::all) {
+        if (buf[0] == Msg::startNextBottle) {
           Serial.println("[can] request to startNextBottle");
           procActive[Proc::NextBottle] = true;
+          //notify
+          message(Controller::all, Msg::activeNextBottle);
         }
       }
     }
 }
 
-void message(int to, int type) {
-  byte buf[1];
-  buf[0] = type;
-  CAN.sendMsgBuf(to, 0, buf, sizeof(buf), true);
-}
 
 
 void setup() {
@@ -109,16 +111,18 @@ void loop() {
           if (iBottlePosition != ON) {
             currState[Proc::NextBottle] = NextBottleWaitBottlePosition;
           }
-          contunue_loop();
+          break;
         }
         case NextBottleWaitBottlePosition: {
           Serial.println("NextBottle:WaitBottlePosition");
           if (iBottlePosition == ON) {
             oConveyor = OFF;
             Serial.println("oConveyor = OFF");
-            procActive[Proc::NextBottle] = false;            
+            procActive[Proc::NextBottle] = false;
+            //notify
+            message(Controller::all, Msg::passiveNextBottle);            
           }
-          contunue_loop();
+          break;
         }        
       }
    }

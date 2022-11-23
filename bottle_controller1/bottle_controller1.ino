@@ -6,28 +6,27 @@
 
 
 //messages
-#define startForcedSterilization 1 
-#define startKeepSterilization 2
-#define stopKeepSterilization 3
-#define startBottleFilling 4
-#define startNextBottle 5
-#define activeForcedSterilization 6
-#define passiveForcedSterilization 7
-#define activeBottleFilling 8
-#define passiveBottleFilling 9
-#define activeNextBottle 10
-#define passiveNextBottle 11
-//processes
-#define contunue_loop() goto SKIP; 
+enum Msg {
+  startForcedSterilization,
+  startKeepSterilization,
+  stopKeepSterilization,
+  startBottleFilling,
+  startNextBottle,
+  activeForcedSterilization,
+  passiveForcedSterilization,
+  activeBottleFilling,
+  passiveBottleFilling,
+  activeNextBottle,
+  passiveNextBottle,
+  activeKeepSterilization,
+  passiveKeepSterilization
+};
 
-#define all 0
-#define controller1 1
-#define controller2 2
-#define controller3 3
-#define controller4 4
+//controllers
+enum Controller {all, controller1, controller2, controller3, controller4};
 
-enum  Proc {Initialization=0, TankFilling, MainLoop, /* foreign */ ForcedSterilization, NextBottle, BottleFilling };
-enum  State {
+enum Proc {Initialization=0, TankFilling, MainLoop, /* foreign */ ForcedSterilization, KeepSterilization /*?*/, NextBottle, BottleFilling };
+enum State {
   InitializationBegin, InitializationWaitForFilling, InitializationWaitForSterilization, 
   MainLoopBegin, MainLoopWaitForNextBottle, MainLoopWaitForFilling,
   TankFillingBegin, TankFillingTankFilled
@@ -36,7 +35,7 @@ enum  State {
 
 Proc currProc;
 State currState[] = {InitializationBegin, MainLoopBegin, TankFillingBegin}; //init states for each proccess
-bool procActive[] = {true, false, false, false, false, false}; //running processes
+bool procActive[] = {true, false, false, false, false, false, false}; //running processes
 
 bool iLowLevel = false;
 bool iHighLevel = false;
@@ -54,13 +53,13 @@ MCP_CAN CAN(SPI_CS_PIN);
 
 void setup_CAN() {
   Serial.begin(115200);
-  CAN.init_CS(9);
+  CAN.init_CS(10);
   Serial.println("hi I am bottle controller1!");
   Serial.println("Init");
   START_INIT:
     if (CAN_OK == CAN.begin(CAN_500KBPS, MCP_8MHz))  // init can bus : baudrate = 500k
     {
-      Serial.println("CAN BUS Shield init ok!");
+      Serial.println("CAN BUS Shield init ok");
     } else {
       Serial.println("CAN BUS Shield init fail");
       Serial.println("Init CAN BUS Shield again");
@@ -78,9 +77,31 @@ void receive_messages() {
     {
       CAN.readMsgBuf(&len, buf);            
       unsigned short canId = CAN.getCanId();
-      if (canId == controller2 || canId == all) {
-        if (buf[0] == startForcedSterilization) {
+      //Handling messages to start/stop something..
+      if (canId == all) {
+        if (buf[0] == Msg::activeForcedSterilization) {
+          Serial.println("[can] ForcedSterilization is active");          
           procActive[Proc::ForcedSterilization] = true;
+        }
+        if (buf[0] == Msg::passiveForcedSterilization) {
+          Serial.println("[can] ForcedSterilization is passive");          
+          procActive[Proc::ForcedSterilization] = false;
+        }
+        if (buf[0] == Msg::activeKeepSterilization) {
+          Serial.println("[can] KeepSterilization is active");          
+          procActive[Proc::KeepSterilization] = true;
+        }
+        if (buf[0] == Msg::passiveKeepSterilization) {
+          Serial.println("[can] KeepSterilization is passive");          
+          procActive[Proc::KeepSterilization] = false;
+        }
+        if (buf[0] == Msg::activeNextBottle) {
+          Serial.println("[can] NextBottle is active");          
+          procActive[Proc::NextBottle] = true;
+        }
+        if (buf[0] == Msg::passiveNextBottle) {
+          Serial.println("[can] NextBottle is passive");          
+          procActive[Proc::NextBottle] = false;
         }
       }
     }
@@ -89,7 +110,7 @@ void receive_messages() {
 void message(int to, int type) {
   byte buf[1];
   buf[0] = type;
-  CAN.sendMsgBuf(to, 0, buf, sizeof(buf), true);
+  CAN.sendMsgBuf((unsigned long)to, 0, sizeof(buf), buf, true);
 }
 
 
@@ -111,27 +132,27 @@ void loop() {
           Serial.println("Start process TankFilling [local]");
           procActive[Proc::TankFilling] = true;
           currState[Proc::Initialization] = InitializationWaitForFilling;
-          contunue_loop();
+          break;
         }
         case InitializationWaitForFilling: {
           Serial.println("Initialization:WaitForFilling");
           if (!procActive[Proc::TankFilling]) {
             Serial.println("Start process ForcedSterilization [controller2]");
-            message(controller2, startForcedSterilization);
+            message(Controller::controller2, Msg::startForcedSterilization);
             currState[Proc::Initialization] = InitializationWaitForSterilization;
-            contunue_loop();         
+            break;     
           }
         }
         case InitializationWaitForSterilization: {
           Serial.println("Initialization:WaitForSterilization");
           if (!procActive[Proc::ForcedSterilization]) {
             Serial.println("Start process KeepSterilization [controller2]");
-            message(controller2, startKeepSterilization);\
+            message(Controller::controller2, Msg::startKeepSterilization);
             Serial.println("Start process MainLoop [local]");
             procActive[Proc::MainLoop] = true;
             procActive[Proc::Initialization] = false;
-            Serial.println("Stoped process Initialization [local]");
-            contunue_loop();         
+            Serial.println("Stopped process Initialization [local]");
+            break;        
           }
         }
       }
@@ -141,16 +162,16 @@ void loop() {
       switch (currState[Proc::MainLoop]) {
         case MainLoopBegin: {
           Serial.println("Start process NextBottle [controller4]");
-          message(controller4, startNextBottle);
+          message(Controller::controller4, Msg::startNextBottle);
           currState[Proc::MainLoop] = MainLoopWaitForNextBottle;
-          contunue_loop();
+          break;
         }
         case MainLoopWaitForNextBottle: {
           if (!procActive[Proc::NextBottle]) {
             Serial.println("Start process BottleFilling [controller3]");
-            message(controller3, startBottleFilling);
+            message(Controller::controller3, startBottleFilling);
             currState[Proc::MainLoop] = MainLoopWaitForFilling;
-            contunue_loop();
+            break;
           }
         }
         case MainLoopWaitForFilling: {
@@ -162,12 +183,12 @@ void loop() {
               procActive[Proc::Initialization] = true;
               procActive[Proc::MainLoop] = false;
               Serial.println("Stopped process MainLoop [local]");
-              contunue_loop();
+              break;
             } else {
               //restart
               Serial.println("Restart process MainLoop [local]");
               currState[Proc::MainLoop] = MainLoopBegin;
-              contunue_loop();
+              break;
             }
           }
         }
@@ -183,7 +204,7 @@ void loop() {
             Serial.println("oFillTank = ON");
           }
             currState[Proc::TankFilling] = TankFillingTankFilled;
-            contunue_loop();
+            break;
         }
         case TankFillingTankFilled: {
           Serial.println("TankFilling:TankFilled");
@@ -191,7 +212,7 @@ void loop() {
             oFillTank = OFF;
             Serial.println("oFillTank = OFF");
             procActive[Proc::TankFilling] = false;
-            contunue_loop();
+            break;
           }
         }
       }
@@ -201,6 +222,9 @@ void loop() {
 
   SKIP:
   delay(1000);
+  //RR strategy
+  currProc = currProc + 1;
+  if (currProc > 2) currProc = 0;  
 }
 
 /*********************************************************************************************************
