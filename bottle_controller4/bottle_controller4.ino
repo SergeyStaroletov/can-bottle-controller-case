@@ -21,8 +21,23 @@ enum Msg {
   passiveKeepSterilization
 };
 
+enum SimVars{
+  vLowLevel,
+  vHighLevel,
+  vFillTank,
+  vLowTemp,
+  vHighTemp,
+  vSteam,
+  vBottleLevel,
+  vFillBottle,
+  vBottlePosition,
+  vConveyor,
+  vSetBottle
+};
+
+
 //controllers
-enum Controller {all, controller1, controller2, controller3, controller4};
+enum Controller {all, controller1, controller2, controller3, controller4, sim};
 
 enum Proc {NextBottle=0, /* foreign */ };
 enum State {
@@ -70,6 +85,14 @@ void message(int to, int type) {
   CAN.sendMsgBuf((unsigned long)to, 0, sizeof(buf), buf, true);
 }
 
+void sim_message(int type, bool val) {
+  byte buf[2];
+  buf[0] = type;
+  buf[1] = (byte)val;
+  int to = sim;
+  CAN.sendMsgBuf((unsigned long)to, 0, sizeof(buf), buf, true);
+}
+
 
 
 void receive_messages() {
@@ -79,6 +102,15 @@ void receive_messages() {
     {
       CAN.readMsgBuf(&len, buf);            
       unsigned short canId = CAN.getCanId();
+
+      if (canId == sim && len > 1) {
+        if (buf[0] == SimVars::vBottlePosition) {
+          iBottlePosition = (buf[1] > 0);
+          Serial.print("[CAN sim msg] iBottlePosition is ");
+          Serial.print(iBottlePosition);          
+        }
+      }
+
       if (canId == Controller::controller4 || canId == Controller::all) {
         if (buf[0] == Msg::startNextBottle) {
           Serial.println("[can] request to startNextBottle");
@@ -108,6 +140,9 @@ void loop() {
         case NextBottleBegin: {
           Serial.println("NextBottle:Begin");
           oConveyor = ON;
+          Serial.println("oConveyor = ON");
+          sim_message(SimVars::vConveyor, oConveyor);
+
           if (iBottlePosition != ON) {
             currState[Proc::NextBottle] = NextBottleWaitBottlePosition;
           }
@@ -118,6 +153,8 @@ void loop() {
           if (iBottlePosition == ON) {
             oConveyor = OFF;
             Serial.println("oConveyor = OFF");
+            sim_message(SimVars::vConveyor, oConveyor);
+
             procActive[Proc::NextBottle] = false;
             //notify
             message(Controller::all, Msg::passiveNextBottle);            
