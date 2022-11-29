@@ -22,10 +22,24 @@ enum Msg {
   passiveKeepSterilization
 };
 
-//controllers
-enum Controller {all, controller1, controller2, controller3, controller4};
+enum SimVars{
+  vLowLevel,
+  vHighLevel,
+  vFillTank,
+  vLowTemp,
+  vHighTemp,
+  vSteam,
+  vBottleLevel,
+  vFillBottle,
+  vBottlePosition,
+  vConveyor,
+  vSetBottle
+};
 
-enum Proc {Initialization=0, TankFilling, MainLoop, /* foreign */ ForcedSterilization, KeepSterilization /*?*/, NextBottle, BottleFilling };
+//controllers
+enum Controller {all, controller1, controller2, controller3, controller4, sim};
+
+enum Proc {Initialization=0, TankFilling, MainLoop, /* foreign */ ForcedSterilization, KeepSterilization /*?*/, NextBottle, BottleFilling};
 enum State {
   InitializationBegin, InitializationWaitForFilling, InitializationWaitForSterilization, 
   MainLoopBegin, MainLoopWaitForNextBottle, MainLoopWaitForFilling,
@@ -69,6 +83,22 @@ void setup_CAN() {
   Serial.println("CAN ready!");
 }
 
+
+void message(int to, int type) {
+  byte buf[1];
+  buf[0] = type;
+  CAN.sendMsgBuf((unsigned long)to, 0, sizeof(buf), buf, true);
+}
+
+void sim_message(int type, bool val) {
+  byte buf[2];
+  buf[0] = type;
+  buf[1] = (byte)val;
+  int to = sim;
+  CAN.sendMsgBuf((unsigned long)to, 0, sizeof(buf), buf, true);
+}
+
+
 void receive_messages() {
   byte buf[8];
   byte len;
@@ -77,6 +107,21 @@ void receive_messages() {
     {
       CAN.readMsgBuf(&len, buf);            
       unsigned short canId = CAN.getCanId();
+
+      //Plant simulation messages
+      if (canId == sim && len > 1) {
+        if (buf[0] == SimVars::vLowLevel) {
+          iLowLevel = (buf[1] > 0);
+          Serial.print("[CAN sim msg] LowLevel is ");
+          Serial.print(iLowLevel);          
+        }
+        if (buf[0] == SimVars::vHighLevel) {
+          iHighLevel = (buf[1] > 0);
+          Serial.print("[CAN sim msg] iHighLevel is ");
+          Serial.print(iHighLevel);          
+        }
+      }
+
       //Handling messages to start/stop something..
       if (canId == all) {
         if (buf[0] == Msg::activeForcedSterilization) {
@@ -107,11 +152,6 @@ void receive_messages() {
     }
 }
 
-void message(int to, int type) {
-  byte buf[1];
-  buf[0] = type;
-  CAN.sendMsgBuf((unsigned long)to, 0, sizeof(buf), buf, true);
-}
 
 
 void setup() {
@@ -176,7 +216,7 @@ void loop() {
         }
         case MainLoopWaitForFilling: {
           if (!procActive[Proc::BottleFilling]) {
-            if (iLowLevel == false) { 
+            if (iLowLevel == OFF) { 
               Serial.println("Stop process KeepSterilization [controller2]");
               message(controller2, stopKeepSterilization);
               Serial.println("Start process Initialization [local]");
@@ -202,6 +242,7 @@ void loop() {
           if (iHighLevel != ON) {
             oFillTank = ON;
             Serial.println("oFillTank = ON");
+            sim_message(vFillTank, oFillTank);
           }
             currState[Proc::TankFilling] = TankFillingTankFilled;
             break;
@@ -211,6 +252,7 @@ void loop() {
           if (iHighLevel == ON) {
             oFillTank = OFF;
             Serial.println("oFillTank = OFF");
+            sim_message(vFillTank, oFillTank);
             procActive[Proc::TankFilling] = false;
             break;
           }
