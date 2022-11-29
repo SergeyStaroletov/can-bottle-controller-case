@@ -22,8 +22,22 @@ enum Msg {
   passiveKeepSterilization
 };
 
+enum SimVars{
+  vLowLevel,
+  vHighLevel,
+  vFillTank,
+  vLowTemp,
+  vHighTemp,
+  vSteam,
+  vBottleLevel,
+  vFillBottle,
+  vBottlePosition,
+  vConveyor,
+  vSetBottle
+};
+
 //controllers
-enum Controller {all, controller1, controller2, controller3, controller4};
+enum Controller {all, controller1, controller2, controller3, controller4, sim};
 
 //processes needed for the current controller 
 enum Proc {ForcedSterilization=0, KeepSterilization, /* foreign */} ;
@@ -79,6 +93,13 @@ void message(int to, int type) {
   CAN.sendMsgBuf((unsigned long)to, 0, sizeof(buf), buf, true);
 }
 
+void sim_message(int type, bool val) {
+  byte buf[2];
+  buf[0] = type;
+  buf[1] = (byte)val;
+  int to = sim;
+  CAN.sendMsgBuf((unsigned long)to, 0, sizeof(buf), buf, true);
+}
 
 
 void receive_messages() {
@@ -88,8 +109,20 @@ void receive_messages() {
     {
       CAN.readMsgBuf(&len, buf);            
       unsigned short canId = CAN.getCanId();
-      Serial.print("CAN message, to id = ");
-      Serial.println(canId);      
+
+      if (canId == sim && len > 1) {
+        if (buf[0] == SimVars::vLowTemp) {
+          iLowTemp = (buf[1] > 0);
+          Serial.print("[CAN sim msg] LowTemp is ");
+          Serial.print(iLowTemp);          
+        }
+        if (buf[0] == SimVars::vHighTemp) {
+          iHighTemp = (buf[1] > 0);
+          Serial.print("[CAN sim msg] iHighTemp is ");
+          Serial.print(iHighTemp);          
+        }
+      }
+
       if (canId == controller2 || canId == all) {
         if (buf[0] == Msg::startForcedSterilization) {
           Serial.println("[can] request to startForcedSterilization");          
@@ -129,7 +162,9 @@ void loop() {
       switch (currState[Proc::ForcedSterilization]) {
         case ForcedSterilizationHeatUp: {
           Serial.println("ForcedSterilization:HeatUp");
+          Serial.println("oSteam = ON");
           oSteam = ON;
+          sim_message(SimVars::vSteam, oSteam);
           if (iHighTemp == ON) {
               currState[Proc::ForcedSterilization] = ForcedSterilizationSterilizationFor1min;              
               timeInState[State::ForcedSterilizationSterilizationFor1min] = 0;
@@ -139,10 +174,12 @@ void loop() {
         case ForcedSterilizationSterilizationFor1min: {
           Serial.println("ForcedSterilization:SterilizationFor1min");
           timeInState[State::ForcedSterilizationSterilizationFor1min]++;
-          if (timeInState == 60) {//timeout
+          if (timeInState[State::ForcedSterilizationSterilizationFor1min] == 60) {//timeout
             Serial.println("timeour for ForcedSterilization:SterilizationFor1min");
             timeInState[State::ForcedSterilizationSterilizationFor1min] = 0;
+            Serial.println("oSteam = OFF");
             oSteam = OFF;
+            sim_message(SimVars::vSteam, oSteam);
             procActive[Proc::ForcedSterilization] = false;
             //notify
             message(Controller::all, Msg::passiveForcedSterilization);
@@ -155,7 +192,9 @@ void loop() {
         case KeepSterilizationWaitLowTemp: {
           Serial.println("KeepSterilization:WaitLowTemp");
           if (iLowTemp != ON) {
+            Serial.println("oSteam = ON");
             oSteam = ON;
+            sim_message(SimVars::vSteam, oSteam);
             currState[Proc::KeepSterilization] = KeepSterilizationWaitHighTemp;
           }
           break;
@@ -163,7 +202,9 @@ void loop() {
         case KeepSterilizationWaitHighTemp: {
           Serial.println("KeepSterilization:WaitHighTemp");
           if (iHighTemp == ON) {
+            Serial.println("oSteam = OFF");
             oSteam = OFF;
+            sim_message(SimVars::vSteam, oSteam);
             Serial.println("restarting");
             currState[Proc::KeepSterilization] = KeepSterilizationWaitLowTemp; //restart-go to the first state
           }
