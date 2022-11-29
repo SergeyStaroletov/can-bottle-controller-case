@@ -22,8 +22,22 @@ enum Msg {
   passiveKeepSterilization
 };
 
+enum SimVars{
+  vLowLevel,
+  vHighLevel,
+  vFillTank,
+  vLowTemp,
+  vHighTemp,
+  vSteam,
+  vBottleLevel,
+  vFillBottle,
+  vBottlePosition,
+  vConveyor,
+  vSetBottle
+};
+
 //controllers
-enum Controller {all, controller1, controller2, controller3, controller4};
+enum Controller {all, controller1, controller2, controller3, controller4, sim};
 
 enum Proc {BottleFilling=0, /* foreign */ };
 enum State {
@@ -73,6 +87,16 @@ void message(int to, int type) {
   CAN.sendMsgBuf((unsigned long)to, 0, sizeof(buf), buf, true);
 }
 
+void sim_message(int type, bool val) {
+  byte buf[2];
+  buf[0] = type;
+  buf[1] = (byte)val;
+  int to = sim;
+  CAN.sendMsgBuf((unsigned long)to, 0, sizeof(buf), buf, true);
+}
+
+
+
 void receive_messages() {
   byte buf[8];
   byte len;
@@ -80,6 +104,15 @@ void receive_messages() {
     {
       CAN.readMsgBuf(&len, buf);            
       unsigned short canId = CAN.getCanId();
+
+      if (canId == sim && len > 1) {
+        if (buf[0] == SimVars::vBottleLevel) {
+          iBottleLevel = (buf[1] > 0);
+          Serial.print("[CAN sim msg] iBottleLevel is ");
+          Serial.print(iBottleLevel);          
+        }
+      }
+
       if (canId == Controller::controller3 || canId == Controller::all) {
         if (buf[0] == Msg::startBottleFilling) {
           Serial.println("[can] request to startBottleFilling");
@@ -108,8 +141,12 @@ void loop() {
         case BottleFillingBegin: {
           Serial.println("BottleFilling:Begin");
           oFillBottle = ON;
+          Serial.println("oFillBottle = ON");
+          sim_message(SimVars::vFillBottle, oFillBottle);
+
           if (iBottleLevel == ON) {
               iBottleLevel = OFF;
+              sim_message(SimVars::vBottleLevel, iBottleLevel);
               Serial.println("iBottleLevel = OFF");
               procActive[Proc::BottleFilling] = false;
               message(Controller::all, Msg::passiveBottleFilling);
