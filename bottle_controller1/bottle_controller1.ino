@@ -113,12 +113,12 @@ void receive_messages() {
         if (buf[0] == SimVars::vLowLevel) {
           iLowLevel = (buf[1] > 0);
           Serial.print("[CAN sim msg] LowLevel is ");
-          Serial.print(iLowLevel);          
+          Serial.println(iLowLevel);          
         }
         if (buf[0] == SimVars::vHighLevel) {
           iHighLevel = (buf[1] > 0);
           Serial.print("[CAN sim msg] iHighLevel is ");
-          Serial.print(iHighLevel);          
+          Serial.println(iHighLevel);          
         }
       }
 

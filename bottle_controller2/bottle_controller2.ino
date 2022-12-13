@@ -114,12 +114,12 @@ void receive_messages() {
         if (buf[0] == SimVars::vLowTemp) {
           iLowTemp = (buf[1] > 0);
           Serial.print("[CAN sim msg] LowTemp is ");
-          Serial.print(iLowTemp);          
+          Serial.println(iLowTemp);          
         }
         if (buf[0] == SimVars::vHighTemp) {
           iHighTemp = (buf[1] > 0);
           Serial.print("[CAN sim msg] iHighTemp is ");
-          Serial.print(iHighTemp);          
+          Serial.println(iHighTemp);          
         }
       }
 

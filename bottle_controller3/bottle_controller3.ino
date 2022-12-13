@@ -68,7 +68,7 @@ void setup_CAN() {
   Serial.println("hi I am bottle controller3");
   Serial.println("Init");
   START_INIT:
-    if (CAN_OK == CAN.begin(CAN_500KBPS, MCP_8MHz))  // init can bus : baudrate = 500k
+    if (CAN_OK == CAN.begin(CAN_500KBPS, MCP_16MHz))  // init can bus : baudrate = 500k
     {
       Serial.println("CAN BUS Shield init ok");
     } else {
@@ -109,7 +109,7 @@ void receive_messages() {
         if (buf[0] == SimVars::vBottleLevel) {
           iBottleLevel = (buf[1] > 0);
           Serial.print("[CAN sim msg] iBottleLevel is ");
-          Serial.print(iBottleLevel);          
+          Serial.println(iBottleLevel);          
         }
       }
 

@@ -267,7 +267,7 @@ void loop() {
             TankTemp = TankTemp - (TankTemp - ROOM_TEMP) * COOLING_RATE;     
           if (TankTemp >= HIGH_TEMP) { 
             iHighTemp = ON;
-             Serial.println("iHighTemp = ON");
+            Serial.println("iHighTemp = ON");
             sim_message(SimVars::vHighTemp, iHighTemp);
           } else { 
             iHighTemp = OFF; 
