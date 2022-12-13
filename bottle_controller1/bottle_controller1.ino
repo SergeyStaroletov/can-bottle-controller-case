@@ -48,7 +48,7 @@ enum State {
 
 
 Proc currProc;
-State currState[] = {InitializationBegin, MainLoopBegin, TankFillingBegin}; //init states for each proccess
+State currState[] = {InitializationBegin, TankFillingBegin, MainLoopBegin}; //init states for each proccess
 bool procActive[] = {true, false, false, false, false, false, false}; //running processes
 
 bool iLowLevel = false;
@@ -209,7 +209,7 @@ void loop() {
         case MainLoopWaitForNextBottle: {
           if (!procActive[Proc::NextBottle]) {
             Serial.println("Start process BottleFilling [controller3]");
-            message(Controller::controller3, startBottleFilling);
+            message(Controller::controller3, Msg::startBottleFilling);
             currState[Proc::MainLoop] = MainLoopWaitForFilling;
             break;
           }
