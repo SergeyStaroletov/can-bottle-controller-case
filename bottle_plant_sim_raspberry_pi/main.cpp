@@ -73,8 +73,6 @@ enum SimVars {
   vSetBottle
 };
 
-const bool ON = true;
-const bool OFF = false;
 
 /*===== P1 VARIABLES =====*/
 bool iLowLevel;
@@ -127,7 +125,7 @@ const float MAX_UNDER_NOZZLE = 150.0;
 const float CONVEYOR_RATE = 1.0;
 const float CONVEYOR_LENGTH = 160.0;
 
-bool Prev;
+bool Prev = false;
 
 class SerialClass {
 
@@ -210,7 +208,7 @@ class ControllerThread : public QThread {
         unsigned short canId = frame.frameId();
 
         // gremlin for iSetBottle -- todo: by pressing a real button
-        if (rand() % 10 == 5) {
+        if (rand() % 10 > 5) {
           Serial.println("SetBottle is pressed!");
           iSetBottle = ON;
         } else
@@ -356,6 +354,7 @@ class ControllerThread : public QThread {
             if ((iSetBottle == ON) && (Prev == OFF)) {
               Serial.println("SetBottle: iSetBottle OFF->ON");
               Prev = iSetBottle;
+              iSetBottle = OFF;
               if (oConveyor) {
                 if (BottleCoord == 0.0) {
                   BottleCoord = MIN_UNDER_NOZZLE;

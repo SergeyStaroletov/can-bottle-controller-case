@@ -64,15 +64,12 @@ bool iBottlePosition = false;
 class SerialClass {
 
 public:
-
-  void init() {  }
-
-  void static println(QString s) { printf("%s\n", s.toLocal8Bit().constData()); }
-
+  void init() {}
+  void static println(QString s) {
+    printf("%s\n", s.toLocal8Bit().constData());
+  }
   void static println(int s) { printf("%d\n", s); }
-
   void static print(int s) { printf("%d", s); }
-
   void static print(QString s) { printf("%s", s.toLocal8Bit().constData()); }
 };
 
@@ -131,8 +128,6 @@ class ControllerThread : public QThread {
     device->writeFrame(newFrame); // id=sim, type, val
   }
 
-
-
   void receive_messages() {
 
     if (device->waitForFramesReceived(0)) { // check if data is coming
@@ -145,7 +140,7 @@ class ControllerThread : public QThread {
           if (frame.payload().at(0) == SimVars::vBottlePosition) {
             iBottlePosition = (frame.payload().at(1) > 0);
             Serial.print("[CAN sim msg] iBottlePosition is ");
-            Serial.print(iBottlePosition);
+            Serial.println(iBottlePosition);
           }
         }
 
