@@ -41,8 +41,8 @@ enum Controller {all, controller1, controller2, controller3, controller4, sim};
 
 enum Proc {Initialization=0, TankFilling, MainLoop, /* foreign */ ForcedSterilization, KeepSterilization /*?*/, NextBottle, BottleFilling};
 enum State {
-  InitializationBegin, InitializationWaitForFilling, InitializationWaitForSterilization, 
-  MainLoopBegin, MainLoopWaitForNextBottle, MainLoopWaitForFilling,
+  InitializationBegin, InitializationWaitForFilling, InitializationWaitForSterilization, InitializationWaitForSterilizationACK,
+  MainLoopBegin, MainLoopBeginACK, MainLoopWaitForNextBottle, MainLoopWaitForNextBottleACK, MainLoopWaitForFilling,
   TankFillingBegin, TankFillingTankFilled
   };
 
@@ -180,20 +180,28 @@ void loop() {
             Serial.println("Start process ForcedSterilization [controller2]");
             message(Controller::controller2, Msg::startForcedSterilization);
             currState[Proc::Initialization] = InitializationWaitForSterilization;
-            break;     
           }
+          break;     
         }
         case InitializationWaitForSterilization: {
           Serial.println("Initialization:WaitForSterilization");
           if (!procActive[Proc::ForcedSterilization]) {
             Serial.println("Start process KeepSterilization [controller2]");
-            message(Controller::controller2, Msg::startKeepSterilization);
+            currState[Proc::Initialization] = InitializationWaitForSterilizationACK;
+          }
+          break;
+        }
+        case InitializationWaitForSterilizationACK: {
+          Serial.println("Waiting for process KeepSterilization [controller2]");
+          //send messages until it started
+          message(Controller::controller2, Msg::startKeepSterilization);
+          if (procActive[Proc::KeepSterilization]) {
             Serial.println("Start process MainLoop [local]");
             procActive[Proc::MainLoop] = true;
             procActive[Proc::Initialization] = false;
-            Serial.println("Stopped process Initialization [local]");
-            break;        
+            Serial.println("Stopped process Initialization [local]");      
           }
+          break;
         }
       }
       break;
@@ -202,17 +210,32 @@ void loop() {
       switch (currState[Proc::MainLoop]) {
         case MainLoopBegin: {
           Serial.println("Start process NextBottle [controller4]");
+          currState[Proc::MainLoop] = MainLoopBeginACK;
+          break;
+        }
+        case MainLoopBeginACK: {
+          Serial.println("Waiting for process NextBottle [controller4]");
           message(Controller::controller4, Msg::startNextBottle);
-          currState[Proc::MainLoop] = MainLoopWaitForNextBottle;
+          if (procActive[Proc::NextBottle]) {
+            currState[Proc::MainLoop] = MainLoopWaitForNextBottle;
+          }
           break;
         }
         case MainLoopWaitForNextBottle: {
+          Serial.println("Waiting for completeness of process NextBottle [controller4]");
           if (!procActive[Proc::NextBottle]) {
             Serial.println("Start process BottleFilling [controller3]");
-            message(Controller::controller3, Msg::startBottleFilling);
-            currState[Proc::MainLoop] = MainLoopWaitForFilling;
-            break;
+            currState[Proc::MainLoop] = MainLoopWaitForNextBottleACK;
           }
+          break;
+        }
+        case MainLoopWaitForNextBottleACK: {
+            Serial.println("Waiting for process BottleFilling [controller3]");
+            message(Controller::controller3, Msg::startBottleFilling);
+          if (procActive[Proc::BottleFilling]) {
+            currState[Proc::MainLoop] = MainLoopWaitForFilling;
+          }
+          break;
         }
         case MainLoopWaitForFilling: {
           if (!procActive[Proc::BottleFilling]) {
