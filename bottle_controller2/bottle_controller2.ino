@@ -184,8 +184,8 @@ void loop() {
             //notify
             message(Controller::all, Msg::passiveForcedSterilization);
           }
-          break;
         }
+        break;
       }
     case Proc::KeepSterilization: if (procActive[Proc::KeepSterilization]) {
       switch (currState[Proc::KeepSterilization]) {
