@@ -354,7 +354,7 @@ class ControllerThread : public QThread {
             break;
           }
           case SetBottleCheckRisingEdge: {
-            if ((iSetBottle == ON) && (Prev == OFF)) {
+            if (iSetBottle == ON) { //&& (Prev == OFF)) {
               Serial.println("SetBottle: iSetBottle OFF->ON");
               Prev = iSetBottle;
               iSetBottle = OFF;
@@ -375,9 +375,7 @@ class ControllerThread : public QThread {
         if (procActive[Proc::BottleFillingSim]) {
           switch (currState[Proc::BottleFillingSim]) {
           case BottleFillingSimBegin: {
-            iBottleLevel = OFF;
-            Serial.println("iBottleLevel = OFF");
-            sim_message(SimVars::vBottleLevel, iBottleLevel);
+
             if ((BottleCoord >= MIN_UNDER_NOZZLE) &&
                 (BottleCoord < MAX_UNDER_NOZZLE)) {
               Serial.println(
@@ -391,6 +389,10 @@ class ControllerThread : public QThread {
                 iBottleLevel = ON;
                 Serial.println("iBottleLevel = ON");
                 sim_message(SimVars::vBottleLevel, iBottleLevel);
+              } else {
+                 iBottleLevel = OFF;
+                 Serial.println("iBottleLevel = OFF");
+                 sim_message(SimVars::vBottleLevel, iBottleLevel);
               }
             }
           }
@@ -402,9 +404,6 @@ class ControllerThread : public QThread {
           switch (currState[Proc::ConveyorSim]) {
           case ConveyorSimBegin: {
             if (oConveyor == ON) {
-              iBottlePosition = OFF;
-              sim_message(SimVars::vBottlePosition, iBottlePosition);
-              Serial.println("iBottlePosition = OFF");
               if (BottleCoord > 0.0) {
                 BottleCoord += CONVEYOR_RATE;
                 if ((BottleCoord >= MIN_UNDER_NOZZLE) &&
@@ -414,6 +413,10 @@ class ControllerThread : public QThread {
                   iBottlePosition = ON;
                   sim_message(SimVars::vBottlePosition, iBottlePosition);
                   Serial.println("iBottlePosition = ON");
+                } else {
+                    iBottlePosition = OFF;
+                    sim_message(SimVars::vBottlePosition, iBottlePosition);
+                    Serial.println("iBottlePosition = OFF");
                 }
                 if (BottleCoord >= CONVEYOR_LENGTH) {
                   BottleCoord = 0.0;
