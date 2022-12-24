@@ -118,7 +118,7 @@ const float HIGH_TEMP = 110.0;
 
 const float FILLING_RATE = 1.0;
 const float BOTTLE_FULL_LEVEL = 20.0;
-const float BOTTLE_MAX_LEVEL = 20.0;
+//const float BOTTLE_MAX_LEVEL = 20.0;
 const float MIN_UNDER_NOZZLE = 145.0;
 const float MAX_UNDER_NOZZLE = 150.0;
 
@@ -277,6 +277,7 @@ class ControllerThread : public QThread {
           }
           }
         }
+        break;
       case Proc::TankSim:
         if (procActive[Proc::TankSim]) {
           switch (currState[Proc::TankSim]) {
@@ -308,6 +309,7 @@ class ControllerThread : public QThread {
           }
           }
         }
+        break;
       case Proc::TempSim:
         if (procActive[Proc::TempSim]) {
           switch (currState[Proc::TempSim]) {
@@ -342,6 +344,7 @@ class ControllerThread : public QThread {
           }
           }
         }
+        break;
       case Proc::SetBottle:
         if (procActive[Proc::SetBottle]) {
           switch (currState[Proc::SetBottle]) {
@@ -367,6 +370,7 @@ class ControllerThread : public QThread {
           }
           }
         }
+        break;
       case Proc::BottleFillingSim:
         if (procActive[Proc::BottleFillingSim]) {
           switch (currState[Proc::BottleFillingSim]) {
@@ -392,6 +396,7 @@ class ControllerThread : public QThread {
           }
           }
         }
+        break;
       case Proc::ConveyorSim:
         if (procActive[Proc::ConveyorSim]) {
           switch (currState[Proc::ConveyorSim]) {
@@ -415,8 +420,10 @@ class ControllerThread : public QThread {
                   BottleLevel = 0.0;
                   Serial.println("BottleCoord = 0; BottleLevel = 0");
                 } else
+                {
                   Serial.print("BottleCoord: ");
-                Serial.println(BottleCoord);
+                  Serial.println(BottleCoord);
+                }
               }
             }
           }
