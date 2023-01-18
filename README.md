@@ -1,4 +1,4 @@
-# can-bottle-controller-case
+# CAN-bottle-controller-case
 
 An Arduino + Raspberry PI impl for <a href="https://ieeexplore.ieee.org/document/9896261">bottle-filling system case study</a>
 
